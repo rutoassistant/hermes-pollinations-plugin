@@ -68,17 +68,15 @@ class PollinationsImageGenProvider(ImageGenProvider):
 
         # Try to load from Hermes .env file
         try:
-            from dotenv import load_dotenv
             home = os.getenv("HERMES_HOME", Path.home() / ".hermes")
             env_path = Path(home) / ".env"
-            if env_path.exists():
-                # Load just this specific key
+            if env_path.is_file():
                 for line in env_path.read_text().splitlines():
-                    if line.strip().startswith("POLLINATIONS_API_KEY="):
-                        key = line.split("=", 1)[1].strip().strip('"').strip("'")
-                        if key:
-                            os.environ["POLLINATIONS_API_KEY"] = key
-                            return key
+                    stripped = line.strip()
+                    if stripped.startswith("POLLINATIONS_API_KEY="):
+                        value = stripped.split("=", 1)[1].strip().strip('"').strip("'")
+                        if value:
+                            return value
         except Exception:
             pass
 
@@ -96,9 +94,7 @@ class PollinationsImageGenProvider(ImageGenProvider):
         if not prompt:
             return error_response(error="Prompt is required", error_type="invalid_argument", provider="pollinations")
 
-        model_id = model or _DEFAULT_MODEL
-        if model_id not in _MODELS:
-            model_id = _DEFAULT_MODEL
+        model_id = model if model in _MODELS else _DEFAULT_MODEL
 
         size_map = {
             "square": ("1024", "1024"),
@@ -114,10 +110,7 @@ class PollinationsImageGenProvider(ImageGenProvider):
         if api_key:
             try:
                 logger.info("Using authenticated Pollinations API (gen.pollinations.ai)")
-                url = (
-                    f"https://gen.pollinations.ai/image/{urllib.parse.quote(prompt)}"
-                    f"?model={model_id}&width={width}&height={height}&seed={seed}&key={api_key}"
-                )
+                url = f"https://gen.pollinations.ai/image/{urllib.parse.quote(prompt)}?model={model_id}&width={width}&height={height}&seed={seed}&key={api_key}"
                 saved = save_url_image(url, prefix=f"pollinations_{model_id}")
                 return success_response(
                     image=str(saved),
@@ -133,10 +126,7 @@ class PollinationsImageGenProvider(ImageGenProvider):
         # Fallback to legacy free endpoint
         try:
             logger.info("Using legacy free Pollinations API (image.pollinations.ai)")
-            url = (
-                f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}"
-                f"?model={model_id}&width={width}&height={height}&seed={seed}"
-            )
+            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?model={model_id}&width={width}&height={height}&seed={seed}"
 
             req = urllib.request.Request(url, headers={"User-Agent": "Hermes/1.0"})
             with urllib.request.urlopen(req, timeout=120) as resp:
